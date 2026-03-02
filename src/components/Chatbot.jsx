@@ -170,7 +170,7 @@ export default function Chatbot({ formData }) {
       <div className="card">
         <h2 className="card-title">💬 AI ASSISTANT CHATBOT</h2>
         <p className="card-subtitle">
-          {modeLabel} — Chatbot terhubung dengan data anggota.
+          🟢 Powered by xAI Grok — Chatbot terhubung dengan data anggota.
         </p>
 
         <div className="quick-actions">
