@@ -117,7 +117,7 @@ export default function OCRModule() {
         </div>
 
         {/* KTP Mock Card */}
-        <div className="ktp-mock" onClick={!scanning && !done ? startScan : undefined}>
+        <div className="ktp-mock" onClick={!scanning ? startScan : undefined} style={{ cursor: scanning ? 'default' : 'pointer' }}>
           <div className={`scan-line${scanning ? ' active' : ''}`} />
           <div className="header-band">
             <div>
@@ -140,6 +140,11 @@ export default function OCRModule() {
           {!scanning && !done && (
             <p style={{ textAlign: 'center', marginTop: 16, color: 'var(--text-400)', fontSize: '0.82rem' }}>
               👆 Klik kartu KTP ini untuk memulai scan OCR
+            </p>
+          )}
+          {done && (
+            <p style={{ textAlign: 'center', marginTop: 16, color: 'var(--amber-400)', fontSize: '0.82rem' }}>
+              ✅ Scan selesai — klik untuk scan ulang
             </p>
           )}
         </div>

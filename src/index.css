@@ -643,11 +643,12 @@ input[type="range"]::-moz-range-thumb {
   top: 0;
   left: 0;
   right: 0;
-  height: 3px;
+  height: 2px;
   background: linear-gradient(90deg, transparent, var(--amber-400), transparent);
-  box-shadow: 0 0 15px var(--amber-400);
+  box-shadow: 0 0 8px rgba(251,191,36,0.4);
   opacity: 0;
   pointer-events: none;
+  z-index: 10;
 }
 
 .scan-line.active {
@@ -657,7 +658,8 @@ input[type="range"]::-moz-range-thumb {
 
 @keyframes scanDown {
   0% { top: 0; }
-  100% { top: 100%; }
+  50% { top: calc(100% - 2px); }
+  100% { top: 0; }
 }
 
 .ocr-progress {
