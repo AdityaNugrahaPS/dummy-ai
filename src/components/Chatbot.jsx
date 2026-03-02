@@ -1,10 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
 
-const AI_KEY = import.meta.env.VITE_AI_API_KEY || ''
-const AI_URL = import.meta.env.VITE_AI_API_URL || 'https://api.x.ai/v1/chat/completions'
-const AI_MODEL = import.meta.env.VITE_AI_MODEL || 'grok-4-latest'
-const AI_ENABLED = AI_KEY.length > 10
-
 // ─── SCORE HELPER ────────────────────────────────────────────────
 function quickScore(d) {
   let s = 0
@@ -19,70 +14,6 @@ function quickScore(d) {
   return Math.round(Math.max(0, Math.min(100, s)))
 }
 
-// ─── BUILD CONTEXT for OpenAI ────────────────────────────────────
-function buildSystemPrompt(d) {
-  const score = quickScore(d)
-  const simpPokok = 500000
-  const simpWajib = 2400000
-  const simpSukarela = d.savings
-  const total = simpPokok + simpWajib + simpSukarela
-  const limit = Math.round(d.savings * 2.5)
-
-  return `Kamu adalah AI Assistant untuk Koperasi Simpan Pinjam Digital "Koperasi Sejahtera Mandiri".
-Kamu harus menjawab dalam Bahasa Indonesia yang ramah dan profesional.
-Gunakan emoji secukupnya untuk membuat percakapan lebih friendly.
-
-Data anggota yang sedang login:
-- Lama keanggotaan: ${d.membership} bulan
-- Simpanan Pokok: Rp ${simpPokok.toLocaleString('id-ID')}
-- Simpanan Wajib: Rp ${simpWajib.toLocaleString('id-ID')}
-- Simpanan Sukarela: Rp ${simpSukarela.toLocaleString('id-ID')}
-- Total Simpanan: Rp ${total.toLocaleString('id-ID')}
-- Konsistensi menabung: ${d.consistency}/10
-- Jumlah pinjaman sebelumnya: ${d.loanHistory}
-- Ketepatan pembayaran: ${d.paymentRate}%
-- Skor kelayakan AI: ${score}/100
-- Estimasi limit pinjaman: Rp ${limit.toLocaleString('id-ID')}
-- Jumlah pinjaman yang ingin diajukan: Rp ${d.loanAmount.toLocaleString('id-ID')}
-- Tujuan pinjaman: ${d.purpose}
-
-Aturan koperasi:
-- Bunga pinjaman: 1% per bulan (flat)
-- Tenor maksimal: 24 bulan
-- Minimal keanggotaan untuk pinjam: 6 bulan
-- Jam operasional: Senin-Jumat 08.00-16.00, Sabtu 08.00-12.00 WIB
-- AI hanya memberikan rekomendasi, keputusan akhir tetap oleh pengurus koperasi
-
-Jawab pertanyaan anggota dengan data di atas. Jika ditanya hal di luar konteks koperasi, arahkan kembali ke topik layanan koperasi.`
-}
-
-// ─── AI API CALL (xAI / OpenAI compatible) ──────────────────────
-async function callAI(messages) {
-  const res = await fetch(AI_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${AI_KEY}`,
-    },
-    body: JSON.stringify({
-      model: AI_MODEL,
-      messages,
-      max_tokens: 500,
-      temperature: 0.7,
-      stream: false,
-    }),
-  })
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw new Error(err.error?.message || `API Error: ${res.status}`)
-  }
-
-  const data = await res.json()
-  return data.choices[0].message.content
-}
-
-// ─── RULE-BASED FALLBACK ─────────────────────────────────────────
 function buildResponses(d) {
   const score = quickScore(d)
   const simpPokok = 500000
@@ -101,7 +32,7 @@ function buildResponses(d) {
   }
 }
 
-function getRuleResponse(input, data) {
+function getResponse(input, data) {
   const r = buildResponses(data)
   const l = input.toLowerCase()
   if (l.includes('saldo') || l.includes('simpanan') || l.includes('tabungan')) return r.saldo
@@ -110,10 +41,9 @@ function getRuleResponse(input, data) {
   if (l.includes('skor') || l.includes('kelayakan') || l.includes('nilai') || l.includes('score')) return r.skor
   if (l.includes('jam') || l.includes('buka') || l.includes('operasional') || l.includes('tutup')) return r.jam
   if (l.includes('halo') || l.includes('hai') || l.includes('help') || l.includes('bantuan') || l.includes('hi')) return r.bantuan
-  return null // null = no match, use OpenAI if available
+  return `Terima kasih atas pertanyaan Anda!\n\nCoba tanyakan tentang:\n• "Berapa saldo saya?"\n• "Cara ajukan pinjaman"\n• "Simulasi cicilan"\n• "Berapa skor saya?"\n• "Jam buka koperasi"`
 }
 
-// ─── QUICK ACTIONS ───────────────────────────────────────────────
 const QUICK = [
   { icon: '💰', text: 'Cek Saldo', msg: 'Berapa saldo simpanan saya?' },
   { icon: '📝', text: 'Ajukan Pinjaman', msg: 'Bagaimana cara mengajukan pinjaman?' },
@@ -122,55 +52,40 @@ const QUICK = [
   { icon: '🕐', text: 'Jam Buka', msg: 'Jam operasional koperasi?' },
 ]
 
-// ─── MAIN COMPONENT ─────────────────────────────────────────────
 export default function Chatbot({ formData }) {
   const [messages, setMessages] = useState([
     {
       from: 'bot',
-      text: 'Halo! 👋 Saya asisten virtual Koperasi Sejahtera Mandiri.\n\n🤖 Saya menggunakan AI (xAI Grok) dan terhubung dengan data profil Anda.\n\nSilakan ketik pertanyaan atau pilih topik di atas!'
+      text: 'Halo! 👋 Saya asisten virtual Koperasi Sejahtera Mandiri.\n\nSaya terhubung dengan data profil Anda dan bisa memberikan informasi yang personal.\n\nSilakan ketik pertanyaan atau pilih topik di atas!'
     }
   ])
   const [input, setInput] = useState('')
   const [typing, setTyping] = useState(false)
-  const chatHistoryRef = useRef([])
   const endRef = useRef(null)
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, typing])
 
-  const send = async (text) => {
+  const send = (text) => {
     if (!text.trim() || typing) return
     const userMsg = text.trim()
     setMessages(prev => [...prev, { from: 'user', text: userMsg }])
     setInput('')
     setTyping(true)
 
-    try {
-      chatHistoryRef.current.push({ role: 'user', content: userMsg })
-      const aiMessages = [
-        { role: 'system', content: buildSystemPrompt(formData) },
-        ...chatHistoryRef.current.slice(-10),
-      ]
-      const reply = await callAI(aiMessages)
-      chatHistoryRef.current.push({ role: 'assistant', content: reply })
-      addBotMessage(reply)
-    } catch (err) {
-      addBotMessage(`⚠️ Error: ${err.message}\n\nPastikan API key valid dan koneksi internet aktif.`)
-    }
-  }
-
-  function addBotMessage(text) {
-    setTyping(false)
-    setMessages(prev => [...prev, { from: 'bot', text }])
+    setTimeout(() => {
+      setTyping(false)
+      setMessages(prev => [...prev, { from: 'bot', text: getResponse(userMsg, formData) }])
+    }, 500 + Math.random() * 500)
   }
 
   return (
     <div className="fade-active">
       <div className="card">
-        <h2 className="card-title">💬 AI ASSISTANT CHATBOT</h2>
+        <h2 className="card-title">💬 CHATBOT KOPERASI</h2>
         <p className="card-subtitle">
-          🟢 Powered by xAI Grok — Chatbot terhubung dengan data anggota.
+          Chatbot terhubung dengan data anggota — jawaban dipersonalisasi berdasarkan profil Anda.
         </p>
 
         <div className="quick-actions">
@@ -198,7 +113,7 @@ export default function Chatbot({ formData }) {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && send(input)}
-              placeholder={typing ? 'AI sedang berpikir...' : 'Ketik pertanyaan Anda...'}
+              placeholder="Ketik pertanyaan Anda..."
               disabled={typing}
             />
             <button onClick={() => send(input)} disabled={typing}>
@@ -209,8 +124,4 @@ export default function Chatbot({ formData }) {
       </div>
     </div>
   )
-}
-
-function delay(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms))
 }
